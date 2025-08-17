@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="mn">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Play-Money Slot Demo</title>
+  <style>
+    body { font-family: system-ui, Arial, sans-serif; max-width: 480px; margin: 40px auto; }
+    .reels { display:flex; gap:12px; justify-content:center; margin:16px 0; }
+    .cell { width:90px; height:90px; border:1px solid #ccc; display:flex; align-items:center; justify-content:center; font-size:28px; }
+    .controls { display:flex; gap:8px; justify-content:center; }
+    .bank { text-align:center; margin:8px 0; }
+    .log { font-size:14px; color:#555; min-height:18px; text-align:center; }
+  </style>
+</head>
+<body>
+  <h1>🎰 Slot (Demo)</h1>
+  <div class="bank">Үлдэгдэл: <span id="balance">1000</span> | Мөр: <input id="bet" type="number" value="10" min="1" step="1" style="width:80px"></div>
+  <div class="reels" id="reels"></div>
+  <div class="controls">
+    <button id="spin">SPIN</button>
+    <button id="auto">AUTO (10)</button>
+    <button id="reset">RESET</button>
+  </div>
+  <div class="log" id="log"></div>
+
+  <script>
+    // Симбол ба жин (илүү жинтэй нь илүү олон давтамжтай таарна)
+    const symbols = [
+      { s:"🍒", w:30, pay:2 },   // бага төлбөр, өндөр давтамж
+      { s:"🍋", w:25, pay:3 },
+      { s:"🔔", w:18, pay:5 },
+      { s:"⭐",  w:12, pay:10 },
+      { s:"💎", w:8,  pay:20 },  // өндөр төлбөр, бага давтамж
+      { s:"7️⃣", w:5,  pay:50 }   // jackpot төрлийн
+    ];
+
+    // Жингээс жинлэсэн санамсаргүй сонголт
+    function pickWeighted(list){
+      const total = list.reduce((a,b)=>a+b.w,0);
+      let r = Math.random()*total;
+      for(const item of list){
+        if((r -= item.w) <= 0) return item;
+      }
+      return list[list.length-1];
+    }
+
+    // Тоглогчийн банкролл
+    let balance = 1000;
+    const reelsDiv = document.getElementById('reels');
+    const balanceEl = document.getElementById('balance');
+    const betEl = document.getElementById('bet');
+    const logEl = document.getElementById('log');
+
+    function render(roll){
+      reelsDiv.innerHTML = '';
+      roll.forEach(row=>{
+        const cell = document.createElement('div');
+        cell.className = 'cell';
+        cell.textContent = row.s;
+        reelsDiv.appendChild(cell);
+      });
+    }
+
+    function spinOnce(bet){
+      if (bet < 1) { log('Мөр хамгийн багадаа 1'); return; }
+      if (balance < bet) { log('Үлдэгдэл хүрэлцэхгүй'); return; }
+
+      balance -= bet;
+
+      // 3 мөртэй, тус бүр 1 символ (энийг 3x3 болгож тэлж болно)
+      const roll = [pickWeighted(symbols), pickWeighted(symbols), pickWeighted(symbols)];
+      render(roll);
+
+      // Төлбөрийн дүрэм: 3 ижил = bet * pay, 2 ижил = bet * (pay/2)
+      let payout = 0;
+      const [a,b,c] = roll.map(r=>r.s);
+      if (a===b && b===c){
+        const pay = symbols.find(x=>x.s===a).pay;
+        payout = Math.floor(bet * pay);
+        balance += payout;
+        log(`🎉 3 ижил! Төлбөр: +${payout}`);
+      } else if (a===b || b===c || a===c){
+        const match = a===b ? a : (b===c ? b : a);
+        const pay = symbols.find(x=>x.s===match).pay;
+        payout = Math.floor(bet * Math.max(1, Math.round(pay/2)));
+        balance += payout;
+        log(`✨ 2 ижил! Төлбөр: +${payout}`);
+      } else {
+        log('😗 Хоосон эргэлт');
+      }
+
+      balanceEl.textContent = balance;
+    }
+
+    function log(msg){ logEl.textContent = msg; }
+
+    // Эх рэндэр
+    render([{s:"❔"},{s:"❔"},{s:"❔"}]);
+    balanceEl.textContent = balance;
+
+    // Товчлуурууд
+    document.getElementById('spin').onclick = ()=>{
+      const bet = parseInt(betEl.value,10) || 1;
+      spinOnce(bet);
+    };
+
+    document.getElementById('reset').onclick = ()=>{
+      balance = 1000;
+      balanceEl.textContent = balance;
+      render([{s:"❔"},{s:"❔"},{s:"❔"}]);
+      log('Шинээр эхэллээ');
+    };
+
+    document.getElementById('auto').onclick = async ()=>{
+      let n = 10;
+      const bet = parseInt(betEl.value,10) || 1;
+      while(n-- > 0 && balance >= bet){
+        spinOnce(bet);
+        await new Promise(r=>setTimeout(r, 300));
+      }
+    };
+  </script>
+</body>
+</html>
